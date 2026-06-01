@@ -42,55 +42,48 @@
         // ==========================================
 
         // Supabaseクライアントの初期化
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+        // 変数名を「supabaseClient」に変更して衝突を回避
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
         // UI要素の取得
         const fileInput = document.getElementById('file-input');
         const uploadButton = document.getElementById('upload-button');
         const statusDiv = document.getElementById('status');
         const resultUrlAnchor = document.getElementById('result-url');
-
-        // アップロード処理
+        
+        // アップロード処理（内部の「supabase.storage」も「supabaseClient.storage」に変えます）
         uploadButton.addEventListener('click', async () => {
-            // テストのためのポップアップ（動いているか確認用）
             alert('アップロード処理を開始します！');
-
+        
             const file = fileInput.files[0];
-            
             if (!file) {
                 statusDiv.innerText = 'ファイルを選択してください。';
-                statusDiv.style.color = 'red';
                 return;
             }
-
-            // 状態のリセット
+        
             statusDiv.innerText = 'アップロード中...';
-            statusDiv.style.color = 'black';
-            resultUrlAnchor.innerText = '';
-
-            // ユニークなファイル名を作成
+        
             const fileExtension = file.name.split('.').pop();
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension}`;
-
+        
             try {
-                // ファイルアップロード
-                const { data, error } = await supabase.storage
+                // 【ここも変更】supabaseClient を使う
+                const { data, error } = await supabaseClient.storage
                     .from(BUCKET_NAME)
                     .upload(fileName, file);
-
+        
                 if (error) throw error;
-
-                // パブリックURLの取得
-                const { data: urlData } = supabase.storage
+        
+                // 【ここも変更】supabaseClient を使う
+                const { data: urlData } = supabaseClient.storage
                     .from(BUCKET_NAME)
                     .getPublicUrl(fileName);
-
-                // 成功表示
+        
                 statusDiv.innerText = 'アップロード成功！🎉';
                 statusDiv.style.color = 'green';
                 resultUrlAnchor.href = urlData.publicUrl;
                 resultUrlAnchor.innerText = 'アップロードされたファイルを開く';
-
+        
             } catch (error) {
                 console.error(error);
                 statusDiv.innerText = `エラーが発生しました: ${error.message}`;
