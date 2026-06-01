@@ -44,6 +44,7 @@
 
         // アップロード処理
         uploadButton.addEventListener('click', async () => {
+            alert('ボタンが押されました！'); // ←これが画面に出るかチェック
             const file = fileInput.files[0];
             
             if (!file) {
