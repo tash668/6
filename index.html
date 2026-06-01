@@ -8,7 +8,6 @@
         body { font-family: sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
         .upload-box { border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 8px; }
         button { background-color: #3ecf8e; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
-        button:disabled { background-color: #ccc; }
         #status { margin-top: 20px; font-weight: bold; }
         #result-url { word-break: break-all; margin-top: 10px; display: block; color: #3ecf8e; }
     </style>
@@ -28,10 +27,17 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
-        // 1. Supabaseの接続設定（あなたのプロジェクトの情報に書き換えてください）
+        // ==========================================
+        // 【設定エリア】ここを書き換えてください
+        // ==========================================
+        
         const SUPABASE_URL = 'https://mlqggtjedrynszbgwdtb.supabase.co'; // Project URL
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1scWdndGplZHJ5bnN6Ymd3ZHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjU1NzIsImV4cCI6MjA5NTkwMTU3Mn0.wYNaYV551xcWHLFUa0xLzO_io35zm0xVeNOpwJ_R50E';                 // anon public キー
-        const BUCKET_NAME = 'tash01';                           // 作成したバケット名
+        const BUCKET_NAME = 'tash01';    
+
+        // ==========================================
+        // 【プログラムエリア】ここから下は触らなくてOKです
+        // ==========================================
 
         // Supabaseクライアントの初期化
         const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -44,7 +50,9 @@
 
         // アップロード処理
         uploadButton.addEventListener('click', async () => {
-            alert('ボタンが押されました！'); // ←これが画面に出るかチェック
+            // テストのためのポップアップ（動いているか確認用）
+            alert('アップロード処理を開始します！');
+
             const file = fileInput.files[0];
             
             if (!file) {
@@ -58,24 +66,24 @@
             statusDiv.style.color = 'black';
             resultUrlAnchor.innerText = '';
 
-            // 一意のファイル名を作成（同名ファイルの衝突を防ぐため、タイムスタンプを付与）
+            // ユニークなファイル名を作成
             const fileExtension = file.name.split('.').pop();
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension}`;
 
             try {
-                // 2. Supabase Storage へファイルをアップロード
+                // ファイルアップロード
                 const { data, error } = await supabase.storage
                     .from(BUCKET_NAME)
                     .upload(fileName, file);
 
                 if (error) throw error;
 
-                // 3. アップロードしたファイルのパブリックURLを取得
+                // パブリックURLの取得
                 const { data: urlData } = supabase.storage
                     .from(BUCKET_NAME)
                     .getPublicUrl(fileName);
 
-                // 成功時の表示
+                // 成功表示
                 statusDiv.innerText = 'アップロード成功！🎉';
                 statusDiv.style.color = 'green';
                 resultUrlAnchor.href = urlData.publicUrl;
