@@ -3,93 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Supabase ファイルアップロード</title>
+    <title>Supabase ファイル管理システム</title>
     <style>
-        body { font-family: sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
-        .upload-box { border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 8px; }
-        button { background-color: #3ecf8e; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
-        #status { margin-top: 20px; font-weight: bold; }
-        #result-url { word-break: break-all; margin-top: 10px; display: block; color: #3ecf8e; }
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; color: #333; }
+        .box { border: 1px solid #e0e0e0; padding: 20px; border-radius: 8px; background-color: #fcfcfc; margin-bottom: 20px; }
+        .upload-box { border: 2px dashed #3ecf8e; text-align: center; background-color: #f4fbf8; }
+        button { background-color: #3ecf8e; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold; }
+        button:hover { background-color: #34b279; }
+        .btn-refresh { background-color: #666; margin-top: 0; }
+        .btn-refresh:hover { background-color: #555; }
+        #status { margin-top: 10px; font-weight: bold; }
+        
+        /* リスト部分のスタイル */
+        .list-header { display: flex; justify-content: space-between; align-items: center; margin-top: 30px; border-bottom: 2px solid #3ecf8e; padding-bottom: 5px; }
+        #file-list { list-style: none; padding: 0; margin: 10px 0; }
+        #file-list li { display: flex; justify-content: space-between; align-items: center; padding: 12px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+        #file-list li:hover { background-color: #f9f9f9; }
+        .file-name { word-break: break-all; padding-right: 10px; }
+        .download-link { background-color: #3ecf8e; color: white; text-decoration: none; padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap; }
+        .download-link:hover { background-color: #34b279; }
+        .no-file { text-align: center; color: #999; padding: 20px; }
     </style>
 </head>
 <body>
 
-    <h2>Supabase クラウドストレージ保存</h2>
+    <h2>Supabase クラウドストレージ</h2>
     
-    <div class="upload-box">
+    <div class="box upload-box">
+        <h3>ファイルのアップロード</h3>
         <input type="file" id="file-input" /><br>
         <button id="upload-button">アップロード</button>
+        <div id="status"></div>
     </div>
 
-    <div id="status"></div>
-    <a id="result-url" target="_blank"></a>
+    <div class="list-header">
+        <h3>ルートのファイルリスト</h3>
+        <button id="refresh-button" class="btn-refresh">リスト更新</button>
+    </div>
+    
+    <div class="box">
+        <ul id="file-list">
+            </ul>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
         // ==========================================
-        // 【設定エリア】ここを書き換えてください
+        // 【設定エリア】ご自身の情報に書き換えてください
         // ==========================================
-        
         const SUPABASE_URL =`https://mlqggtjedrynszbgwdtb.supabase.co`;
         //'https://mlqggtjedrynszbgwdtb.supabase.co'; // Project URL
         const SUPABASE_ANON_KEY =`eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1scWdndGplZHJ5bnN6Ymd3ZHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjU1NzIsImV4cCI6MjA5NTkwMTU3Mn0.wYNaYV551xcWHLFUa0xLzO_io35zm0xVeNOpwJ_R50E`;
             //'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1scWdndGplZHJ5bnN6Ymd3ZHRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMjU1NzIsImV4cCI6MjA5NTkwMTU3Mn0.wYNaYV551xcWHLFUa0xLzO_io35zm0xVeNOpwJ_R50E';                 // anon public キー
         const BUCKET_NAME =`tash01`; //'tash01';    
 
-        // ==========================================
-        // 【プログラムエリア】ここから下は触らなくてOKです
-        // ==========================================
-
-        // Supabaseクライアントの初期化
-        // 変数名を「supabaseClient」に変更して衝突を回避
+        // Supabaseクライアントの初期化（名前の重複を回避）
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
+
         // UI要素の取得
         const fileInput = document.getElementById('file-input');
         const uploadButton = document.getElementById('upload-button');
+        const refreshButton = document.getElementById('refresh-button');
         const statusDiv = document.getElementById('status');
-        const resultUrlAnchor = document.getElementById('result-url');
-        
-        // アップロード処理（内部の「supabase.storage」も「supabaseClient.storage」に変えます）
+        const fileListUl = document.getElementById('file-list');
+
+        // ==========================================
+        // 1. ファイルリストを取得して表示する関数
+        // ==========================================
+        async function fetchFileList() {
+            fileListUl.innerHTML = '<li>リストを読み込み中...</li>';
+
+            try {
+                // list() メソッドでバケットのルート直下（''）のファイルを取得
+                const { data: files, error } = await supabaseClient.storage
+                    .from(BUCKET_NAME)
+                    .list('', {
+                        limit: 100,
+                        sortBy: { column: 'name', order: 'asc' }
+                    });
+
+                if (error) throw error;
+
+                // 画面のリストをクリア
+                fileListUl.innerHTML = '';
+
+                // ファイルが空の場合
+                if (!files || files.length === 0) {
+                    fileListUl.innerHTML = '<div class="no-file">ファイルがありません</div>';
+                    return;
+                }
+
+                // 取得したファイルを1つずつ画面に生成
+                files.forEach(file => {
+                    // .list()はフォルダ等も拾うため、プレースホルダーファイル(.emptyFolderPlaceholder)を除外
+                    if (file.name === '.emptyFolderPlaceholder') return;
+
+                    // ファイルのパブリックURLを取得
+                    const { data: urlData } = supabaseClient.storage
+                        .from(BUCKET_NAME)
+                        .getPublicUrl(file.name);
+
+                    // 🛠️ HTML要素の動的組み立て
+                    const li = document.createElement('li');
+                    
+                    // ファイル名部分
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'file-name';
+                    nameSpan.innerText = file.name;
+                    
+                    // ダウンロードボタン（リンク）部分
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.className = 'download-link';
+                    downloadAnchor.href = urlData.publicUrl;
+                    downloadAnchor.target = '_blank';
+                    // download属性を設定（ブラウザによっては直接DL、画像などは別タブで開きます）
+                    downloadAnchor.setAttribute('download', file.name); 
+                    downloadAnchor.innerText = 'ダウンロード';
+
+                    // 要素を合体
+                    li.appendChild(nameSpan);
+                    li.appendChild(downloadAnchor);
+                    fileListUl.appendChild(li);
+                });
+
+            } catch (error) {
+                console.error(error);
+                fileListUl.innerHTML = `<li style="color:red;">リストの取得に失敗: ${error.message}</li>`;
+            }
+        }
+
+        // ==========================================
+        // 2. アップロード処理
+        // ==========================================
         uploadButton.addEventListener('click', async () => {
-            alert('アップロード処理を開始します！');
-        
             const file = fileInput.files[0];
             if (!file) {
                 statusDiv.innerText = 'ファイルを選択してください。';
+                statusDiv.style.color = 'red';
                 return;
             }
-        
+
             statusDiv.innerText = 'アップロード中...';
-        
+            statusDiv.style.color = 'black';
+
             const fileExtension = file.name.split('.').pop();
             const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExtension}`;
-        
+
             try {
-                // 【ここも変更】supabaseClient を使う
                 const { data, error } = await supabaseClient.storage
                     .from(BUCKET_NAME)
                     .upload(fileName, file);
-        
+
                 if (error) throw error;
-        
-                // 【ここも変更】supabaseClient を使う
-                const { data: urlData } = supabaseClient.storage
-                    .from(BUCKET_NAME)
-                    .getPublicUrl(fileName);
-        
+
                 statusDiv.innerText = 'アップロード成功！🎉';
                 statusDiv.style.color = 'green';
-                resultUrlAnchor.href = urlData.publicUrl;
-                resultUrlAnchor.innerText = 'アップロードされたファイルを開く';
-        
+                
+                // アップロードが成功したら、自動的にリストを最新の状態に更新する
+                fetchFileList();
+
             } catch (error) {
                 console.error(error);
-                statusDiv.innerText = `エラーが発生しました: ${error.message}`;
+                statusDiv.innerText = `エラー: ${error.message}`;
                 statusDiv.style.color = 'red';
             }
         });
+
+        // ==========================================
+        // 3. イベントリスナーと初期読み込み
+        // ==========================================
+        
+        // 更新ボタンを押したとき
+        refreshButton.addEventListener('click', fetchFileList);
+
+        // ページを開いた瞬間に一度自動でリストを読み込む
+        window.addEventListener('DOMContentLoaded', fetchFileList);
     </script>
 </body>
 </html>
